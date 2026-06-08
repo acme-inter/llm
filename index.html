@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LLM Deployment Cost Report — 10 Concurrent Users</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0d0e10;--bg-2:#15171a;--panel:#1a1d21;--panel-2:#22262b;--line:#2c3137;
+  --ink:#f4ede2;--ink-dim:#b6ada0;--ink-muted:#7a7468;
+  --accent:#d4ff3a;--accent-2:#ff6b35;--accent-3:#7fb3ff;--accent-4:#c084fc;
+  --warn:#ffb347;--danger:#ff5a6e;--good:#6ee7a7;
+  --serif:'Fraunces',Georgia,serif;
+  --sans:'Inter Tight',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+body{background:
+  radial-gradient(ellipse 1200px 800px at 10% 0%,rgba(212,255,58,.04),transparent 60%),
+  radial-gradient(ellipse 900px 600px at 100% 100%,rgba(127,179,255,.04),transparent 60%),
+  var(--bg);min-height:100vh;overflow-x:hidden}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.4;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.container{max-width:1400px;margin:0 auto;padding:32px 24px 80px;position:relative;z-index:2}
+
+/* HEADER */
+header.masthead{border-bottom:1px solid var(--line);padding-bottom:32px;margin-bottom:32px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.eyebrow::before{content:"";width:30px;height:1px;background:var(--accent)}
+h1.title{font-family:var(--serif);font-weight:800;font-size:clamp(34px,5vw,64px);line-height:.95;letter-spacing:-.02em;margin-bottom:18px}
+h1.title em{font-style:italic;color:var(--accent);font-weight:400}
+.lede{font-family:var(--serif);font-size:17px;color:var(--ink-dim);max-width:680px;font-weight:400;font-style:italic}
+.meta-stack{text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink-muted);line-height:1.8}
+.meta-stack b{color:var(--ink);font-weight:500}
+
+/* ASSUMPTIONS */
+.assumptions{background:var(--panel);border:1px solid var(--accent);border-left-width:4px;padding:20px 24px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+.assumptions-head{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);flex-shrink:0}
+.assump-input{display:flex;flex-direction:column;gap:4px}
+.assump-input label{font-family:var(--mono);font-size:10px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.1em}
+.assump-input input,.assump-input select{background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:6px 10px;font-family:var(--mono);font-size:13px;width:138px}
+.assump-input input:focus,.assump-input select:focus{outline:none;border-color:var(--accent)}
+.assump-divider{width:1px;background:var(--line);align-self:stretch;flex-shrink:0;margin:0 4px}
+.assump-note{font-size:11px;color:var(--ink-muted);font-family:var(--mono);margin-left:auto;max-width:240px;text-align:right;line-height:1.5}
+
+/* CALLOUTS */
+.callout{border-left-width:4px;padding:16px 22px;margin-bottom:28px;font-size:13px;color:var(--ink-dim);line-height:1.6}
+.callout b{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;display:block;margin-bottom:6px}
+.callout strong{color:var(--ink)}
+.callout-warn{background:rgba(255,179,71,.08);border:1px solid var(--warn)}.callout-warn b{color:var(--warn)}
+.callout-info{background:rgba(212,255,58,.06);border:1px solid rgba(212,255,58,.35)}.callout-info b{color:var(--accent)}
+
+/* INTRO */
+.intro{background:var(--panel);border:1px solid var(--line);padding:32px;margin-bottom:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:32px;position:relative}
+.intro::before{content:"01";position:absolute;top:-12px;left:24px;background:var(--bg);padding:0 10px;font-family:var(--mono);color:var(--accent);font-size:11px;letter-spacing:.15em}
+.intro-block h3{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:var(--ink-muted);margin-bottom:10px}
+.intro-block p{font-size:14px;color:var(--ink-dim);line-height:1.65}
+.intro-block strong{color:var(--ink);font-weight:600}
+@media(max-width:768px){.intro{grid-template-columns:1fr}}
+
+/* SECTION */
+section{margin-bottom:64px}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.15em}
+.sec-title{font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.01em}
+.sec-sub{font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-left:auto;text-transform:uppercase;letter-spacing:.1em}
+
+/* CONTROLS */
+.controls{background:var(--panel);border:1px solid var(--line);padding:18px 22px;margin-bottom:28px;display:flex;flex-wrap:wrap;gap:22px;align-items:center}
+.ctrl-group{display:flex;flex-direction:column;gap:6px}
+.ctrl-group label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-muted)}
+.filter-buttons{display:flex;gap:6px;flex-wrap:wrap}
+.filter-btn{background:transparent;border:1px solid var(--line);color:var(--ink-dim);padding:7px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;cursor:pointer;transition:all .15s;text-transform:uppercase}
+.filter-btn:hover{border-color:var(--ink-dim);color:var(--ink)}
+.filter-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+.toggle-group{display:flex;background:var(--bg);border:1px solid var(--line)}
+.toggle-btn{background:transparent;border:none;color:var(--ink-muted);padding:8px 18px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.toggle-btn.active{background:var(--ink);color:var(--bg)}
+
+/* CARDS */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(345px,1fr));gap:20px}
+.card{background:var(--panel);border:1px solid var(--line);padding:22px;position:relative;transition:border-color .2s,transform .2s;display:flex;flex-direction:column}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.card.dgx-highlight{border-color:rgba(212,255,58,.45);background:linear-gradient(160deg,rgba(212,255,58,.04) 0%,var(--panel) 60%)}
+.card-tag{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:3px 8px;display:inline-block;margin-bottom:12px;align-self:flex-start}
+.tag-api{background:rgba(127,179,255,.15);color:var(--accent-3);border:1px solid rgba(127,179,255,.3)}
+.tag-cloud{background:rgba(255,107,53,.15);color:var(--accent-2);border:1px solid rgba(255,107,53,.3)}
+.tag-server{background:rgba(212,255,58,.15);color:var(--accent);border:1px solid rgba(212,255,58,.3)}
+.tag-dgx{background:rgba(212,255,58,.22);color:var(--accent);border:1px solid rgba(212,255,58,.6)}
+.tag-saas{background:rgba(110,231,167,.15);color:var(--good);border:1px solid rgba(110,231,167,.3)}
+.tag-vps{background:rgba(192,132,252,.15);color:var(--accent-4);border:1px solid rgba(192,132,252,.3)}
+.card-name{font-family:var(--serif);font-size:21px;font-weight:600;margin-bottom:4px;line-height:1.15}
+.card-sub{font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-bottom:12px}
+.card-warning{background:rgba(255,90,110,.08);border:1px solid rgba(255,90,110,.4);padding:8px 10px;margin-bottom:12px;font-size:11px;color:var(--danger);font-family:var(--mono)}
+.card-warning b{display:block;font-size:9px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:3px}
+
+/* ONE-TIME BADGE */
+.onetime-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(212,255,58,.08);border:1px solid rgba(212,255,58,.3);
+  padding:10px 14px;margin-bottom:12px;
+}
+.onetime-badge .ot-amount{font-family:var(--serif);font-size:26px;font-weight:800;color:var(--accent);letter-spacing:-.02em}
+.onetime-badge .ot-label{font-family:var(--mono);font-size:10px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.12em;line-height:1.4}
+
+.card-price{font-family:var(--serif);font-size:36px;font-weight:800;letter-spacing:-.02em;line-height:1;margin-bottom:3px}
+.card-price small{font-size:14px;font-weight:400;color:var(--ink-muted);font-family:var(--mono)}
+.card-price-sub{font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-bottom:12px}
+
+/* COST BREAKDOWN (server only) */
+.cost-breakdown{background:rgba(212,255,58,.04);border:1px solid rgba(212,255,58,.18);padding:12px 14px;margin-bottom:12px}
+.cost-breakdown-title{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.cost-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);gap:8px}
+.cost-row:last-child{border-bottom:none;padding-top:8px;margin-top:4px;border-top:1px solid rgba(212,255,58,.25)}
+.cost-row-label{font-size:12px;color:var(--ink-dim);display:flex;align-items:flex-start;gap:7px;flex-direction:column}
+.cost-row-label-main{display:flex;align-items:center;gap:7px}
+.cost-row-formula{font-family:var(--mono);font-size:10px;color:var(--ink-muted);margin-top:2px;line-height:1.4}
+.cost-icon{font-size:13px}
+.cost-row-val{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:600;white-space:nowrap}
+.cost-row.total .cost-row-label{color:var(--ink);font-weight:600;font-size:13px}
+.cost-row.total .cost-row-val{color:var(--accent);font-size:15px}
+.cost-bar-stack{height:7px;background:var(--bg);border:1px solid var(--line);display:flex;overflow:hidden;margin-top:10px}
+.cost-bar-elec{background:#ff6b35;height:100%}
+.cost-bar-admin{background:#6ee7a7;height:100%}
+.cost-bar-legend{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap}
+.cost-bar-legend span{font-family:var(--mono);font-size:9px;color:var(--ink-muted);display:flex;align-items:center;gap:4px}
+.cost-bar-legend span::before{content:"";width:8px;height:8px;border-radius:1px;flex-shrink:0}
+.leg-elec::before{background:#ff6b35}
+.leg-admin::before{background:#6ee7a7}
+
+/* DGX CONCURRENT USERS PANEL */
+.dgx-users{background:rgba(212,255,58,.06);border:1px solid rgba(212,255,58,.3);padding:12px 14px;margin-bottom:12px}
+.dgx-users-title{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.dgx-model-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);gap:8px}
+.dgx-model-row:last-child{border-bottom:none}
+.dgx-model-name{font-size:12px;color:var(--ink-dim)}
+.dgx-model-users{display:flex;align-items:center;gap:6px}
+.dgx-user-dots{display:flex;gap:3px}
+.dgx-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.9}
+.dgx-dot.dim{background:var(--line);opacity:1}
+.dgx-user-count{font-family:var(--mono);font-size:11px;color:var(--ink-dim);white-space:nowrap}
+
+/* ACCURACY */
+.accuracy-bar{margin:12px 0 6px 0}
+.accuracy-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.accuracy-track{height:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.accuracy-fill{height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent),var(--good))}
+
+/* SPECS */
+.card-specs{border-top:1px dashed var(--line);padding-top:12px;margin-top:auto}
+.spec-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:8px}
+.spec-row:last-child{border-bottom:none}
+.spec-label{color:var(--ink-muted);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.spec-val{color:var(--ink);font-weight:500;text-align:right}
+.privacy-bar{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.privacy-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.p-high{background:var(--good);box-shadow:0 0 8px rgba(110,231,167,.5)}
+.p-mid{background:var(--warn);box-shadow:0 0 8px rgba(255,179,71,.5)}
+.p-low{background:var(--danger);box-shadow:0 0 8px rgba(255,90,110,.5)}
+.privacy-text{font-size:12px;color:var(--ink-dim)}
+.privacy-text b{display:block;font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-muted);letter-spacing:.1em;margin-bottom:2px}
+
+/* CHARTS */
+.chart-panel{background:var(--panel);border:1px solid var(--line);padding:28px;margin-bottom:24px}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.chart-head h3{font-family:var(--serif);font-size:22px;font-weight:600}
+.chart-head p{font-family:var(--mono);font-size:11px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.1em}
+.chart-wrap{position:relative;height:640px}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.chart-grid .chart-wrap{height:380px}
+@media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:1100px}
+thead{background:var(--bg-2);border-bottom:2px solid var(--accent)}
+th{text-align:left;padding:13px 15px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-muted);font-weight:500;white-space:nowrap}
+th.num,td.num{text-align:right;font-family:var(--mono)}
+tbody tr{border-bottom:1px solid var(--line);transition:background .15s}
+tbody tr:hover{background:var(--bg-2)}
+tbody tr.dgx-row{background:rgba(212,255,58,.03)}
+td{padding:13px 15px;vertical-align:top}
+td.name{font-weight:600;color:var(--ink)}
+td.name small{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-muted);font-weight:400;text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+.pill{display:inline-block;padding:3px 8px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;border:1px solid}
+.pill-high{color:var(--good);border-color:var(--good)}
+.pill-mid{color:var(--warn);border-color:var(--warn)}
+.pill-low{color:var(--danger);border-color:var(--danger)}
+.pill-cat-api{color:var(--accent-3);border-color:var(--accent-3)}
+.pill-cat-cloud{color:var(--accent-2);border-color:var(--accent-2)}
+.pill-cat-server,.pill-cat-dgx{color:var(--accent);border-color:var(--accent)}
+.pill-cat-saas{color:var(--good);border-color:var(--good)}
+.pill-cat-vps{color:var(--accent-4);border-color:var(--accent-4)}
+.acc-mini{display:inline-flex;align-items:center;gap:6px}
+.acc-mini-track{width:42px;height:5px;background:var(--bg);border:1px solid var(--line);overflow:hidden;display:inline-block}
+.acc-mini-fill{height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent),var(--good))}
+.acc-num{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+
+/* BUDGET PICKS */
+.budget-row{display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;background:var(--panel);border:1px solid var(--line);padding:22px 26px;margin-bottom:14px;position:relative;overflow:hidden}
+.budget-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+.budget-row.b1::before{background:var(--good)}
+.budget-row.b2::before{background:var(--accent-3)}
+.budget-row.b3::before{background:var(--accent-4)}
+.budget-row.b4::before{background:var(--warn)}
+.budget-row.b5::before{background:var(--accent-2)}
+.budget-row.b6::before{background:var(--accent)}
+.budget-range{font-family:var(--mono);font-size:11px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.12em;border-right:1px solid var(--line);padding-right:22px;min-width:195px}
+.budget-range b{display:block;font-family:var(--serif);font-size:21px;color:var(--ink);font-weight:700;margin-top:6px;text-transform:none;letter-spacing:0}
+.budget-pick h4{font-family:var(--serif);font-size:21px;font-weight:600;margin-bottom:6px}
+.budget-pick p{font-size:13px;color:var(--ink-dim);line-height:1.55}
+.budget-pick p em{color:var(--accent);font-style:normal}
+.budget-meta{text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink-muted);line-height:1.75;min-width:190px}
+.budget-meta b{color:var(--ink)}
+@media(max-width:900px){.budget-row{grid-template-columns:1fr}.budget-range{border-right:none;border-bottom:1px solid var(--line);padding-right:0;padding-bottom:12px}.budget-meta{text-align:left}}
+
+/* GLOSSARY */
+.glossary{background:var(--panel);border:1px solid var(--line);padding:32px;display:grid;grid-template-columns:1fr 1fr;gap:16px 40px}
+@media(max-width:700px){.glossary{grid-template-columns:1fr}}
+.gloss-item dt{font-family:var(--mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.gloss-item dd{font-size:13px;color:var(--ink-dim);line-height:1.6}
+
+footer{margin-top:80px;padding-top:32px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--ink-muted);text-align:center;line-height:1.8}
+@media(max-width:768px){header.masthead{grid-template-columns:1fr}.meta-stack{text-align:left}}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="container">
+
+<header class="masthead">
+  <div>
+    <div class="eyebrow">Cost Analysis Report · v5</div>
+    <h1 class="title">The LLM Deployment <em>Ledger</em>:<br>What 10 Users Really Cost.</h1>
+    <p class="lede">Every way to deploy a large language model for a small team — APIs, EU VPS, cloud GPUs, owned servers, and the NVIDIA DGX Spark — with full cost breakdowns, concurrent-user limits, accuracy scores, and privacy ratings in Thai Baht.</p>
+  </div>
+  <div class="meta-stack">
+    <div><b>Scope</b> · 10 concurrent users</div>
+    <div><b>Currency</b> · Thai Baht (THB)</div>
+    <div><b>Workload</b> · 50M tokens/month</div>
+    <div><b>FX</b> · editable below</div>
+    <div><b>Updated</b> · May 2026</div>
+  </div>
+</header>
+
+<!-- INPUTS -->
+<div class="assumptions">
+  <div class="assumptions-head">Live inputs</div>
+  <div class="assump-input"><label>THB / USD</label><input type="number" id="fxUsd" value="32" min="20" max="60" step="0.5"/></div>
+  <div class="assump-input"><label>THB / EUR</label><input type="number" id="fxEur" value="35" min="20" max="70" step="0.5"/></div>
+  <div class="assump-input"><label>Claude Team plan</label>
+    <select id="claudeBilling">
+      <option value="25">$25/seat (monthly)</option>
+      <option value="20" selected>$20/seat (annual)</option>
+    </select>
+  </div>
+  <div class="assump-input"><label>Seats / users</label><input type="number" id="seatsInput" value="10" min="1" step="1"/></div>
+  <div class="assump-input"><label>Tokens/mo (M)</label><input type="number" id="tokensInput" value="50" min="1" step="5"/></div>
+  <div class="assump-divider"></div>
+  <div class="assump-input" style="border-left:2px solid rgba(255,107,53,.4);padding-left:14px">
+    <label>⚡ Electricity ฿/kWh</label>
+    <input type="number" id="elecRate" value="4.5" min="1" max="20" step="0.1"/>
+  </div>
+  <div class="assump-note">Hardware = one-time purchase (no loan/amortisation). Monthly cost = <strong style="color:var(--accent-2)">electricity only</strong>. Admin assumed absorbed by existing IT staff.</div>
+</div>
+
+<div class="callout callout-info">
+  <b>💡 Hardware cost = one-time payment · No amortisation, no loan</b>
+  Owned server prices are shown as a <strong>single upfront payment</strong>. Monthly ongoing cost = <strong>electricity only</strong>. Admin is assumed to be absorbed by existing IT staff at no extra cost. This gives the true picture: a large one-time number, then a very low monthly electricity cost forever.
+</div>
+
+<div class="callout callout-warn">
+  <b>⚠ Contabo & IONOS VPS are CPU-only — not suitable for 10 concurrent users</b>
+  These plans have no GPU. They run models at ~2–10 tokens/sec on CPU — only 1–3 users realistically. Included for EU privacy comparison. The IONOS <em>AI Model Hub API</em> (pay-per-token) IS suitable.
+</div>
+
+<div class="intro">
+  <div class="intro-block">
+    <h3>Five ways to deploy AI</h3>
+    <p><strong>Cloud APIs</strong> — pay per word, no hardware. <strong>EU VPS</strong> — cheap EU servers but CPU-only. <strong>Cloud GPUs</strong> — rent by the hour. <strong>Owned servers</strong> — buy once, low monthly cost. <strong>SaaS / Team plans</strong> — per-seat ready product.</p>
+  </div>
+  <div class="intro-block">
+    <h3>Why owned servers still have monthly cost</h3>
+    <p>Even buying hardware outright, one real cost remains every month: <strong>electricity</strong>. A GPU runs 24/7 drawing 170W (DGX Spark) to 1,200W (2× A100). Admin is assumed absorbed by your existing IT team — no extra charge.</p>
+  </div>
+  <div class="intro-block">
+    <h3>What is the DGX Spark?</h3>
+    <p>NVIDIA's <strong>DGX Spark</strong> (~$3,000 / ฿96,000) is a desktop AI supercomputer with 128 GB unified memory — it can run 70B models in FP16. But it's a single-chip device. Concurrent user capacity is limited by model size. Each card shows exactly how many users it can serve.</p>
+  </div>
+</div>
+
+<!-- SECTION 2: CARDS -->
+<section>
+  <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">All options compared</span><span class="sec-sub" id="optCount">—</span></div>
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Filter group</label>
+      <div class="filter-buttons" id="cardFilters">
+        <button class="filter-btn active" data-cat="all">All</button>
+        <button class="filter-btn" data-cat="api">Cloud APIs</button>
+        <button class="filter-btn" data-cat="saas">SaaS / Team</button>
+        <button class="filter-btn" data-cat="vps">EU VPS</button>
+        <button class="filter-btn" data-cat="cloud">Cloud GPU</button>
+        <button class="filter-btn" data-cat="server">Owned Server</button>
+        <button class="filter-btn" data-cat="dgx">DGX Spark</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Sort by</label>
+      <div class="toggle-group" id="sortToggle">
+        <button class="toggle-btn active" data-sort="price">Price ↑</button>
+        <button class="toggle-btn" data-sort="accuracy">Accuracy ↓</button>
+        <button class="toggle-btn" data-sort="privacy">Privacy ↓</button>
+      </div>
+    </div>
+  </div>
+  <div class="card-grid" id="optionCards"></div>
+</section>
+
+<!-- SECTION 3: CHARTS -->
+<section>
+  <div class="sec-head"><span class="sec-num">03</span><span class="sec-title">Cost visualisation</span><span class="sec-sub">Filterable · live</span></div>
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Period</label>
+      <div class="toggle-group" id="periodToggle">
+        <button class="toggle-btn active" data-period="monthly">Monthly</button>
+        <button class="toggle-btn" data-period="annual">Annual</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Filter</label>
+      <div class="filter-buttons" id="chartFilters">
+        <button class="filter-btn active" data-cat="all">All</button>
+        <button class="filter-btn" data-cat="api">APIs</button>
+        <button class="filter-btn" data-cat="saas">SaaS</button>
+        <button class="filter-btn" data-cat="vps">EU VPS</button>
+        <button class="filter-btn" data-cat="cloud">Cloud GPU</button>
+        <button class="filter-btn" data-cat="server">Owned</button>
+        <button class="filter-btn" data-cat="dgx">DGX</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Chart view</label>
+      <div class="toggle-group" id="viewToggle">
+        <button class="toggle-btn active" data-view="bar">Bar</button>
+        <button class="toggle-btn" data-view="line">5-Yr total</button>
+        <button class="toggle-btn" data-view="stacked">Server split</button>
+      </div>
+    </div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-head">
+      <div><h3 id="chartTitle">Monthly cost — all options</h3>
+        <p style="margin-top:6px;font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink-muted)">Lower = cheaper · bar color = category · hover for details</p>
+      </div>
+      <p id="chartUnit">in thousand THB</p>
+    </div>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-panel">
+      <div class="chart-head"><div><h3>Accuracy vs Cost</h3>
+        <p style="margin-top:6px;font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink-muted)">Top-left = best value (high accuracy, low cost)</p>
+      </div></div>
+      <div class="chart-wrap"><canvas id="scatterAcc"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-head"><div><h3>Privacy vs Cost</h3>
+        <p style="margin-top:6px;font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink-muted)">Top-left = best value (high privacy, low cost)</p>
+      </div></div>
+      <div class="chart-wrap"><canvas id="scatterPriv"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4: TABLE -->
+<section>
+  <div class="sec-head"><span class="sec-num">04</span><span class="sec-title">Full comparison table</span><span class="sec-sub">Server costs = electricity only</span></div>
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Filter</label>
+      <div class="filter-buttons" id="tableFilters">
+        <button class="filter-btn active" data-cat="all">All</button>
+        <button class="filter-btn" data-cat="api">APIs</button>
+        <button class="filter-btn" data-cat="saas">SaaS</button>
+        <button class="filter-btn" data-cat="vps">EU VPS</button>
+        <button class="filter-btn" data-cat="cloud">Cloud GPU</button>
+        <button class="filter-btn" data-cat="server">Owned</button>
+        <button class="filter-btn" data-cat="dgx">DGX</button>
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Option</th><th>Group</th><th>Hardware / Plan</th>
+          <th class="num">One-time (THB)</th>
+          <th class="num">Electricity/mo</th>
+          <th class="num">Total monthly</th>
+          <th class="num">Annual (THB)</th>
+          <th>Privacy</th><th>Accuracy</th><th>Max concurrent users</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 5: DGX SPARK DETAIL -->
+<section>
+  <div class="sec-head"><span class="sec-num">05</span><span class="sec-title">NVIDIA DGX Spark — deep dive</span><span class="sec-sub">Models, user limits, specs</span></div>
+  <div class="intro" style="grid-template-columns:1fr 1fr;margin-bottom:24px">
+    <div class="intro-block">
+      <h3>What it is</h3>
+      <p>The DGX Spark is a palm-sized desktop AI supercomputer — NVIDIA's <strong>GB10 Grace Blackwell Superchip</strong>, with <strong>128 GB unified memory</strong> shared between CPU and GPU. Price: <strong>฿175,000</strong>.</p>
+      <p style="margin-top:10px">It is <strong>one physical device</strong>. You load one AI model at a time. The model you choose determines how many users can use it simultaneously — that is the only variable you control. Bigger model = smarter but fewer simultaneous users.</p>
+    </div>
+    <div class="intro-block">
+      <h3>The honest limitation</h3>
+      <p>It's a <strong>single chip device</strong>. The table below shows exactly what happens at each model size: load a 7B model → up to 10 users; load a 14B model → up to 6 users; load a 70B model → only 1 user at a time (the 70B model alone uses 140 GB of the 128 GB — it actually needs Q4 quantisation to fit).</p>
+      <p style="margin-top:10px"><strong>Monthly running cost: electricity only</strong> — 170W is very low. At ฿4.5/kWh that is about ฿367/month. Hardware cost ฿175,000 one-time.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Model on DGX Spark</th>
+          <th>Precision</th>
+          <th>VRAM used</th>
+          <th>KV cache left</th>
+          <th>Concurrent users</th>
+          <th>Tok/sec (single)</th>
+          <th>Tok/sec (10 users)</th>
+          <th>Accuracy</th>
+          <th>Suitable for 10?</th>
+        </tr>
+      </thead>
+      <tbody id="dgxModelBody"></tbody>
+    </table>
+  </div>
+  <p style="margin-top:14px;color:var(--ink-muted);font-size:12px;font-family:var(--mono)">
+    KV cache left = 128 GB − model weights. Each user at 4K context needs ~1–2 GB KV cache. Concurrent users = floor(KV cache ÷ 1.5 GB). Token speeds are estimates for NVIDIA Blackwell at INT4/FP16.
+  </p>
+</section>
+
+<!-- SECTION 6: ACCURACY -->
+<section>
+  <div class="sec-head"><span class="sec-num">06</span><span class="sec-title">Accuracy: what the score means</span><span class="sec-sub">0–100 explained</span></div>
+  <div class="intro" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+    <div class="intro-block">
+      <h3>How we scored</h3>
+      <p>Blended <strong>MMLU</strong> (knowledge), <strong>HumanEval</strong> (coding), <strong>MATH</strong> (reasoning), <strong>MT-Bench</strong> (chat) — normalised 0–100. Same model = same score regardless of host.</p>
+    </div>
+    <div class="intro-block">
+      <h3>What the bands mean</h3>
+      <p><strong>90+</strong> Frontier. <strong>80–89</strong> Strong. <strong>70–79</strong> Good (14B). <strong>60–69</strong> Basic (7B). Quantization (Q4) costs ~3 pts. CPU-only → assume low end of band.</p>
+    </div>
+    <div class="intro-block">
+      <h3>Speed vs accuracy</h3>
+      <p>Even buying hardware outright, one real cost remains every month: <strong>electricity</strong>. The GPU runs 24/7. Below is the exact calculation for each server size.</p>
+    </div>
+    <div class="intro-block">
+      <h3>DGX Spark accuracy note</h3>
+      <p>DGX Spark runs models at higher precision than a budget server — <strong>FP16 for 70B fits in 128 GB</strong>. That means no quantization tax. You get the true model score, not a degraded Q4 version.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 7: BUDGET PICKS -->
+<section>
+  <div class="sec-head"><span class="sec-num">07</span><span class="sec-title">Best value at every budget</span><span class="sec-sub">Pick by what you can spend</span></div>
+  <div id="budgetPicks"></div>
+</section>
+
+<!-- SECTION 8: SERVER SPECS -->
+<section>
+  <div class="sec-head"><span class="sec-num">08</span><span class="sec-title">Hardware specs for self-hosting</span><span class="sec-sub">Power draw · electricity · monthly cost</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Machine / Model</th><th>GPU</th><th>VRAM</th><th>RAM</th><th class="num">One-time (THB)</th><th class="num">Power draw</th><th class="num">Elec/mo (฿)</th><th>Accuracy</th><th>Max users</th></tr>
+      </thead>      <tbody id="serverSpecsBody"></tbody>
+    </table>
+  </div>
+  <p style="margin-top:14px;color:var(--ink-muted);font-size:12px;font-family:var(--mono)">Electricity at current ฿/kWh rate above · Admin absorbed by existing IT staff (฿0 additional)</p>
+</section>
+
+<!-- SECTION 9: PRIVACY -->
+<section>
+  <div class="sec-head"><span class="sec-num">09</span><span class="sec-title">Privacy: where does your data go?</span><span class="sec-sub">Plain language</span></div>
+  <div class="intro" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+    <div class="intro-block">
+      <h3 style="color:var(--good)">🟢 HIGH — Self-hosted</h3>
+      <p>Data <strong>never leaves your network</strong>. Best for medical, legal, finance. Includes DGX Spark, owned servers, cloud GPU instances you control.</p>
+    </div>
+    <div class="intro-block">
+      <h3 style="color:var(--warn)">🟡 MEDIUM — Enterprise APIs & EU VPS</h3>
+      <p>Data goes to vendor but they <strong>do not train on it</strong> by contract. IONOS AI API is EU-hosted (GDPR). Claude/OpenAI have DPA available.</p>
+    </div>
+    <div class="intro-block">
+      <h3 style="color:var(--danger)">🔴 LOW — Consumer / China-hosted</h3>
+      <p>DeepSeek API is hosted in China. Chinese law allows government data access. Free chatbots may train on conversations unless opted out.</p>
+    </div>
+    <div class="intro-block">
+      <h3 style="color:var(--accent-3)">📋 Claude Team — specifics</h3>
+      <p>Anthropic does not train on your team's conversations. Encrypted at rest and in transit. BAA available for healthcare. Admin controls.</p>
+      <p style="margin-top:8px">Pricing: $25/seat/month or $20/seat/year. Verify at <span style="color:var(--accent)">anthropic.com/pricing</span>.</p>
+    </div>
+  </div>
+</section>
+
+
+
+<!-- SECTION 10: CURRENT CLOUD SERVER INVOICE -->
+<section>
+  <div class="sec-head"><span class="sec-num">10</span><span class="sec-title">Your current cloud server bill</span><span class="sec-sub">April 2026 invoice</span></div>
+  <div class="callout callout-info">
+    <b>📄 Invoice data — April 2026</b>
+    This is your actual Hetzner cloud invoice for April 2026. All three application projects plus storage = <strong>$606.94/month</strong>. The THB amount updates live with the FX rate you set above.
+  </div>
+
+  <!-- invoice table -->
+  <div class="table-wrap" style="margin-bottom:24px">
+    <table style="min-width:600px">
+      <thead>
+        <tr>
+          <th>Service</th><th>Period</th>
+          <th class="num">USD (excl. VAT)</th>
+          <th class="num">Tax</th>
+          <th class="num">USD Total</th>
+          <th class="num">THB Total</th>
+        </tr>
+      </thead>
+      <tbody id="invoiceBody"></tbody>
+    </table>
+  </div>
+
+  <!-- monthly / annual summary cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:32px" id="invoiceSummaryCards"></div>
+
+  <!-- what are these projects -->
+  <div class="intro" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0">
+    <div class="intro-block">
+      <h3>Project "Central" — $260.77</h3>
+      <p>Your main shared services / API gateway project. Likely the largest cluster — running Spring Boot microservices, databases, and shared infrastructure. Biggest cost item at <strong>43% of total bill</strong>.</p>
+    </div>
+    <div class="intro-block">
+      <h3>Project "Erp" — $291.39</h3>
+      <p>The ERP module infrastructure. Slightly more expensive than Central — possibly running more compute-heavy workloads (data sync, scheduled jobs, larger DB). <strong>48% of total bill</strong>.</p>
+    </div>
+    <div class="intro-block">
+      <h3>Project "Checklist" + Storage — $54.78</h3>
+      <p>The checklist module ($46.79) is a smaller workload — probably fewer servers or smaller instances. Storage ($7.99) covers object storage, snapshots, or volumes across all projects. <strong>9% of bill</strong>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 11: DELL POWEREDGE R6615 DEEP DIVE -->
+<section>
+  <div class="sec-head"><span class="sec-num">11</span><span class="sec-title">Dell PowerEdge R6615</span><span class="sec-sub">Full spec · electricity · vs cloud</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+    <!-- spec panel -->
+    <div style="background:var(--panel);border:1px solid var(--line);padding:24px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:16px">Full specification</div>
+      <table style="width:100%;min-width:unset;font-size:13px">
+        <tbody id="dellSpecBody"></tbody>
+      </table>
+    </div>
+
+    <!-- cost panel -->
+    <div style="background:var(--panel);border:1px solid var(--line);padding:24px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:16px">Cost breakdown</div>
+
+      <div style="margin-bottom:20px">
+        <div style="font-family:var(--serif);font-size:38px;font-weight:800;letter-spacing:-.02em;color:var(--ink)">฿172,805</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-top:4px">One-time purchase · includes 3-year ProSupport warranty</div>
+      </div>
+
+      <div style="background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.3);padding:14px;margin-bottom:16px">
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-2);margin-bottom:10px">Monthly electricity calculation</div>
+        <div style="font-size:13px;color:var(--ink-dim);font-family:var(--mono);line-height:2" id="dellElecCalc"></div>
+      </div>
+
+      <div style="font-size:13px;color:var(--ink-dim);line-height:1.7">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)">
+          <span>One-time hardware</span><span style="font-family:var(--mono);color:var(--ink);font-weight:600">฿172,805</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)">
+          <span>Monthly electricity</span><span style="font-family:var(--mono);color:var(--accent-2);font-weight:600" id="dellElecMonthly">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)">
+          <span>Annual electricity (12 mo)</span><span style="font-family:var(--mono);color:var(--ink-dim)" id="dellElecAnnual">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)">
+          <span>3-year total cost (hardware + elec)</span><span style="font-family:var(--mono);color:var(--ink);font-weight:600" id="dell3yr">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--accent)">
+          <span style="font-weight:600;color:var(--ink)">Avg monthly equivalent (3yr)</span><span style="font-family:var(--mono);color:var(--accent);font-weight:700;font-size:15px" id="dellAvgMonthly">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- important note: this is an app server, not a GPU AI server -->
+  <div class="callout callout-warn">
+    <b>⚠ Important — this is an application server, not a GPU AI server</b>
+    The Dell PowerEdge R6615 has <strong>no GPU</strong>. It is a CPU-only rack server suitable for running your Spring Boot microservices, databases, API gateways, and application workloads — exactly what your Hetzner cloud projects are doing today. <strong>It cannot run AI models</strong> (DeepSeek, Llama, etc.) at useful speed. To run AI on-premise you still need a separate GPU server. This Dell server replaces your <em>cloud infrastructure bill</em>, not your AI inference cost.
+  </div>
+</section>
+
+<!-- SECTION 12: CLOUD vs DELL — SAVE OR LOSE? -->
+<section>
+  <div class="sec-head"><span class="sec-num">12</span><span class="sec-title">Cloud vs Dell: save or not?</span><span class="sec-sub">Comparison · advantages · disadvantages</span></div>
+
+  <!-- live comparison numbers -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px" id="comparisonCards"></div>
+
+  <!-- break-even chart -->
+  <div class="chart-panel" style="margin-bottom:24px">
+    <div class="chart-head">
+      <div><h3>5-year cumulative cost: Cloud vs Dell PowerEdge</h3>
+        <p style="margin-top:6px;font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink-muted)">
+          The lines cross at the break-even point — after that the Dell is cheaper. Updates live with your FX and electricity inputs.
+        </p>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height:380px"><canvas id="breakEvenChart"></canvas></div>
+  </div>
+
+  <!-- pro/con grid -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="background:var(--panel);border:1px solid var(--line);padding:24px;border-top:3px solid var(--accent-2)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent-2);margin-bottom:16px">☁ Keep Cloud (Hetzner) — Advantages</div>
+      <ul id="cloudPros" style="list-style:none;font-size:13px;color:var(--ink-dim);line-height:1.9"></ul>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--line);padding:24px;border-top:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:16px">🖥 Switch to Dell PowerEdge — Advantages</div>
+      <ul id="dellPros" style="list-style:none;font-size:13px;color:var(--ink-dim);line-height:1.9"></ul>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--line);padding:24px;border-top:3px solid rgba(255,90,110,.6)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--danger);margin-bottom:16px">☁ Keep Cloud — Disadvantages</div>
+      <ul id="cloudCons" style="list-style:none;font-size:13px;color:var(--ink-dim);line-height:1.9"></ul>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--line);padding:24px;border-top:3px solid rgba(255,90,110,.6)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--danger);margin-bottom:16px">🖥 Switch to Dell — Disadvantages</div>
+      <ul id="dellCons" style="list-style:none;font-size:13px;color:var(--ink-dim);line-height:1.9"></ul>
+    </div>
+  </div>
+
+  <!-- verdict -->
+  <div style="background:rgba(212,255,58,.06);border:1px solid rgba(212,255,58,.4);border-left-width:5px;padding:24px;margin-top:20px">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px">📋 Recommendation</div>
+    <div id="verdictText" style="font-size:14px;color:var(--ink-dim);line-height:1.7"></div>
+  </div>
+</section>
+
+
+  Prepared for ACME International (Thailand) · Vendor public pricing as of May 2026<br>
+  DGX Spark: NVIDIA list price ~$3,000 USD. Electricity: Thai commercial average ฿4.5/kWh.<br>
+  Verify SaaS pricing on official vendor pages before final decisions.
+</footer>
+</div>
+
+<script>
+// ============================================================
+// INPUTS — single source of truth
+// ============================================================
+const inputs = {
+  fxUsd: 32, fxEur: 35, claudeUSD: 20, seats: 10, tokensM: 50,
+  elecRate: 4.5,
+};
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const DELL_WATTS        = 300;
+const DELL_CAPEX        = 172805;
+const INVOICE_TOTAL_USD = 606.94;
+const INVOICE = [
+  {service:'Project "Central"',   period:'04/2026', usd:260.77},
+  {service:'Project "Erp"',       period:'04/2026', usd:291.39},
+  {service:'Project "Checklist"', period:'04/2026', usd:46.79},
+  {service:'Storage',             period:'04/2026', usd:7.99},
+];
+const DELL_SPECS = [
+  {k:'CPU',     v:'AMD EPYC 9124 3.0GHz, 16C/32T, 64MB Cache (200W) DDR5-4800'},
+  {k:'RAM',     v:'16 GB (1×16GB) RDIMM 5600 MT/s, Single Rank'},
+  {k:'SSD',     v:'2× 960 GB SSD SATA Read Intensive 6Gbps 2.5" Hot-plug, 1 DWPD'},
+  {k:'RAID',    v:'PERC H755 SAS Front with Bracket'},
+  {k:'NIC',     v:'Broadcom 5720 Dual Port 1GbE LOM'},
+  {k:'Power',   v:'Dual Hot-Plug Redundant (1+1) 700W Titanium · 200–240Vac'},
+  {k:'Chassis', v:'2.5" 8-Bay Universal (SAS/SATA/NVMe) · TPM 2.0 · LCD Bezel · Sliding Rails'},
+  {k:'Mgmt',    v:'iDRAC9 Enterprise 16G + OpenManage Enterprise Advanced'},
+  {k:'Warranty',v:'3Yr ProSupport · 4-Hour Onsite + 3Yr Keep Your Hard Drive'},
+  {k:'GPU',     v:'None — CPU-only server (app/DB workloads only, not AI inference)'},
+  {k:'Price',   v:'฿172,805 one-time'},
+];
+const DGX_MODELS = [
+  {model:'DeepSeek-R1 7B',    prec:'FP16', vram:14,  acc:68, tokSingle:200, note:''},
+  {model:'Llama 3.1 8B',      prec:'FP16', vram:16,  acc:72, tokSingle:180, note:''},
+  {model:'Qwen 2.5 14B',      prec:'FP16', vram:28,  acc:78, tokSingle:140, note:''},
+  {model:'DeepSeek-R1 14B',   prec:'FP16', vram:28,  acc:78, tokSingle:130, note:''},
+  {model:'Mistral Small 24B', prec:'FP16', vram:48,  acc:80, tokSingle:110, note:''},
+  {model:'Llama 3.3 70B',     prec:'FP16', vram:140, acc:87, tokSingle:40,  note:'Flagship for DGX Spark'},
+  {model:'DeepSeek-R1 70B',   prec:'FP16', vram:140, acc:88, tokSingle:38,  note:''},
+  {model:'Qwen 2.5 72B',      prec:'FP16', vram:144, acc:86, tokSingle:38,  note:''},
+  {model:'Llama 3.1 405B',    prec:'Q4',   vram:230, acc:89, tokSingle:12,  note:'Too large for 128 GB'},
+];
+const COLORS = {api:'#7fb3ff', cloud:'#ff6b35', server:'#d4ff3a', dgx:'#d4ff3a', saas:'#6ee7a7', vps:'#c084fc'};
+
+// ============================================================
+// COST HELPERS
+// ============================================================
+const calcElec = watts => Math.round(watts * 24 * 30 / 1000 * inputs.elecRate);
+
+// ============================================================
+// CATEGORY LABEL
+// ============================================================
+const catLabel = c => ({api:'Cloud API',cloud:'Cloud GPU',server:'Owned Server',dgx:'DGX Spark',vps:'EU VPS',saas:'SaaS'}[c]||c);
+const privacyVal = p => p==='high'?3:p==='mid'?2:1;
+const privacyTxt = p => p==='high'?'High':p==='mid'?'Medium':'Low';
+
+// ============================================================
+// BUILD OPTIONS
+// ============================================================
+function buildOptions(){
+  const fx=inputs.fxUsd, fxE=inputs.fxEur, seats=inputs.seats, tokM=inputs.tokensM, cT=inputs.claudeUSD;
+  const dgxUsers = vram => vram>124 ? 0 : Math.max(1,Math.min(10,Math.floor((128-vram)/1.5)));
+  const dgxMonthly = calcElec(170);
+
+  return [
+    // CLOUD APIs
+    {id:'openai-4o',   name:'OpenAI GPT-4o API',        sub:'Cloud API · per-token',       cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*8.75*fx), setup:0, hardware:'None (cloud)', privacy:'mid',
+      privacyLabel:'Medium · No training, 30-day logs', accuracy:91, maxUsers:'Unlimited',
+      specs:[['Per 1M tokens','฿'+Math.round(8.75*fx)],['Data','USA'],['Setup','1 hour'],['Best for','Production apps']]},
+    {id:'openai-mini', name:'OpenAI GPT-4o mini',        sub:'Cloud API · budget tier',     cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*0.45*fx), setup:0, hardware:'None (cloud)', privacy:'mid',
+      privacyLabel:'Medium · No training, 30-day logs', accuracy:82, maxUsers:'Unlimited',
+      specs:[['Per 1M tokens','฿'+Math.round(0.45*fx)],['Data','USA'],['Setup','1 hour'],['Best for','High volume']]},
+    {id:'claude-sonnet',name:'Claude Sonnet 4 API',      sub:'Cloud API · Anthropic',       cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*9*fx),    setup:0, hardware:'None (cloud)', privacy:'mid',
+      privacyLabel:'Medium-High · No training, DPA available', accuracy:92, maxUsers:'Unlimited',
+      specs:[['Per 1M tokens','฿'+Math.round(9*fx)],['Data','USA/EU'],['Setup','1 hour'],['Best for','Knowledge work']]},
+    {id:'claude-haiku', name:'Claude Haiku 4.5 API',     sub:'Cloud API · fast tier',       cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*1.5*fx),  setup:0, hardware:'None (cloud)', privacy:'mid',
+      privacyLabel:'Medium-High · No training', accuracy:84, maxUsers:'Unlimited',
+      specs:[['Per 1M tokens','฿'+Math.round(1.5*fx)],['Data','USA/EU'],['Setup','1 hour'],['Best for','Volume + quality']]},
+    {id:'deepseek-api', name:'DeepSeek-V3 API',          sub:'Cloud API · DeepSeek (CN)',   cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*0.27*fx), setup:0, hardware:'None (cloud)', privacy:'low',
+      privacyLabel:'Low · China-hosted, gov access risk', accuracy:89, maxUsers:'Unlimited',
+      specs:[['Per 1M tokens','฿'+Math.round(0.27*fx)],['Data','China'],['Setup','1 hour'],['Best for','Non-sensitive bulk']]},
+    {id:'ionos-70b',    name:'IONOS API · Llama 3.3 70B',sub:'Cloud API · EU Germany',      cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*0.71*fx), setup:0, hardware:'None (cloud)', privacy:'mid',
+      privacyLabel:'Medium-High · EU GDPR, no training', accuracy:86, maxUsers:'Unlimited',
+      specs:[['Per 1M tokens','฿'+Math.round(0.71*fx)],['Data','EU Germany'],['Setup','1 hour'],['Best for','EU compliance']]},
+    {id:'ionos-mistral',name:'IONOS API · Mistral 24B',  sub:'Cloud API · EU Germany',      cat:'api', tag:'tag-api',
+      monthly:Math.round(tokM*0.22*fx), setup:0, hardware:'None (cloud)', privacy:'mid',
+      privacyLabel:'Medium-High · EU GDPR, no training', accuracy:79, maxUsers:'Unlimited',
+      specs:[['In/Out per 1M','฿'+Math.round(0.11*fx)+'/฿'+Math.round(0.33*fx)],['Data','EU Germany'],['Setup','1 hour'],['Best for','EU + budget']]},
+
+    // SaaS
+    {id:'claude-team',  name:'Claude Team Plan',         sub:'SaaS · per-seat',             cat:'saas',tag:'tag-saas',
+      monthly:seats*cT*fx, setup:0, hardware:'None', privacy:'mid',
+      privacyLabel:'Medium-High · No training, admin controls', accuracy:92, maxUsers:'Unlimited',
+      specs:[['Per user/mo','฿'+Math.round(cT*fx).toLocaleString()],['Billing',cT===20?'Annual ($20)':'Monthly ($25)'],['Includes','Web UI, Projects, MCP'],['Best for','Business teams']]},
+    {id:'chatgpt-team', name:'ChatGPT Team',             sub:'SaaS · per-seat',             cat:'saas',tag:'tag-saas',
+      monthly:seats*25*fx, setup:0, hardware:'None', privacy:'mid',
+      privacyLabel:'Medium-High · No training on team data', accuracy:91, maxUsers:'Unlimited',
+      specs:[['Per user/mo','฿'+Math.round(25*fx).toLocaleString()],['Min seats','2'],['Includes','GPT-4o, custom GPTs'],['Best for','General office use']]},
+
+    // EU VPS
+    {id:'contabo-m', name:'Contabo VDS M', sub:'EU VPS · CPU-only · €35.84/mo', cat:'vps', tag:'tag-vps',
+      monthly:Math.round(35.84*fxE), setup:0, hardware:'6 vCPU · 16 GB RAM · no GPU',
+      privacy:'high', privacyLabel:'High · EU Germany, GDPR', accuracy:62, maxUsers:'1–2',
+      warning:'CPU-only. ~2–5 tok/sec. Not suitable for 10 concurrent users.',
+      specs:[['EUR/month','€35.84 (annual)'],['GPU','None'],['Models','7B Q4 only'],['10-user?','No']]},
+    {id:'contabo-l', name:'Contabo VDS L', sub:'EU VPS · CPU-only · €51.20/mo', cat:'vps', tag:'tag-vps',
+      monthly:Math.round(51.20*fxE), setup:0, hardware:'8 vCPU · 32 GB RAM · no GPU',
+      privacy:'high', privacyLabel:'High · EU Germany, GDPR', accuracy:67, maxUsers:'1–3',
+      warning:'CPU-only. Handles up to 14B Q4 but very slow.',
+      specs:[['EUR/month','€51.20 (annual)'],['GPU','None'],['Models','Up to 14B Q4'],['10-user?','No']]},
+    {id:'contabo-xl', name:'Contabo VDS XL', sub:'EU VPS · CPU-only · €65.92/mo', cat:'vps', tag:'tag-vps',
+      monthly:Math.round(65.92*fxE), setup:0, hardware:'12 vCPU · 48 GB RAM · no GPU',
+      privacy:'high', privacyLabel:'High · EU Germany, GDPR', accuracy:75, maxUsers:'2–4',
+      warning:'CPU-only. Borderline for 10 users.',
+      specs:[['EUR/month','€65.92 (annual)'],['GPU','None'],['Models','14B Q4'],['10-user?','Borderline']]},
+    {id:'contabo-xxl',name:'Contabo VDS XXL',sub:'EU VPS · CPU-only · €95.20/mo', cat:'vps', tag:'tag-vps',
+      monthly:Math.round(95.20*fxE), setup:0, hardware:'16 vCPU · 64 GB RAM · no GPU',
+      privacy:'high', privacyLabel:'High · EU Germany, GDPR', accuracy:80, maxUsers:'3–5',
+      warning:'CPU-only. Heavy latency under load.',
+      specs:[['EUR/month','€95.20 (annual)'],['GPU','None'],['Models','Up to 47B Q4'],['10-user?','Borderline only']]},
+
+    // CLOUD GPU
+    {id:'cloud-7b',  name:'Cloud GPU · 7B/8B',    sub:'Rented A100 40GB (Lambda)', cat:'cloud',tag:'tag-cloud',
+      monthly:Math.round(1.29*24*30*fx), setup:15000, hardware:'1× A100 40GB',
+      privacy:'high', privacyLabel:'High · Private instance', accuracy:68, maxUsers:'8–10',
+      specs:[['GPU $/hr','$1.29 → ฿'+Math.round(1.29*fx)],['Models','Qwen 7B, Llama 8B'],['Can pause','Yes'],['Best for','Sensitive + low budget']]},
+    {id:'cloud-14b', name:'Cloud GPU · 14B',       sub:'Rented A100 80GB (Lambda)', cat:'cloud',tag:'tag-cloud',
+      monthly:Math.round(1.99*24*30*fx), setup:15000, hardware:'1× A100 80GB',
+      privacy:'high', privacyLabel:'High · Private instance', accuracy:76, maxUsers:'6–10',
+      specs:[['GPU $/hr','$1.99 → ฿'+Math.round(1.99*fx)],['Models','DeepSeek-R1 14B, Qwen 14B'],['Can pause','Yes'],['Best for','Privacy + flex']]},
+    {id:'cloud-47b', name:'Cloud GPU · 47B MoE',   sub:'Rented 2× A100 80GB (Lambda)',cat:'cloud',tag:'tag-cloud',
+      monthly:Math.round(3.20*24*30*fx), setup:18000, hardware:'2× A100 80GB',
+      privacy:'high', privacyLabel:'High · Private instance', accuracy:84, maxUsers:'5–8',
+      specs:[['GPU $/hr','$3.20 → ฿'+Math.round(3.20*fx)],['Models','DeepSeek-R1 47B, Mixtral 8×7B'],['Can pause','Yes'],['Best for','Sensitive + strong quality']]},
+    {id:'cloud-70b', name:'Cloud GPU · 70B',       sub:'Rented 2× A100 80GB (Lambda)',cat:'cloud',tag:'tag-cloud',
+      monthly:Math.round(3.79*24*30*fx), setup:20000, hardware:'2× A100 80GB',
+      privacy:'high', privacyLabel:'High · Private instance', accuracy:86, maxUsers:'4–6',
+      specs:[['GPU $/hr','$3.79 → ฿'+Math.round(3.79*fx)],['Models','Llama 3.3 70B, Qwen 72B'],['Can pause','Yes'],['Best for','Quality + privacy']]},
+
+    // DGX SPARK — single unit, model is your choice
+    {id:'dgx', name:'NVIDIA DGX Spark', sub:'Desktop AI supercomputer · one device · you choose the model', cat:'dgx', tag:'tag-dgx', dgx:true,
+      monthly:dgxMonthly, setup:175000, hardware:'GB10 Grace Blackwell · 128 GB unified memory · 1,000 AI TOPS',
+      privacy:'high', privacyLabel:'Highest · On-premise, offline capable',
+      accuracy:87, // best model it can run (70B)
+      maxUsers:'Up to 10 (depends on model — see card)',
+      dgxElec:calcElec(170), watts:170, capex:175000,
+      specs:[['One-time cost','฿175,000'],['Memory','128 GB unified (CPU+GPU shared)'],['Power','~170W (very efficient)'],['Best for','On-prem AI · privacy-first']]},
+
+    // OWNED SERVERS
+    {id:'own-dell', name:'Dell PowerEdge R6615',        sub:'Buy hardware · one-time · ฿172,805', cat:'server',tag:'tag-server',
+      get monthly(){ return calcElec(DELL_WATTS) }, setup:DELL_CAPEX, hardware:'AMD EPYC 9124 · 16GB RAM · 2×960GB SSD',
+      privacy:'high', privacyLabel:'Highest · On-premise', accuracy:75, maxUsers:'6–10 (app server)',
+      watts:DELL_WATTS, capex:DELL_CAPEX,
+      specs:[['One-time hardware','฿172,805'],['CPU','AMD EPYC 9124 16C/32T'],['Power draw','~300W avg'],['Best for','App/DB server (no GPU)']]},
+    {id:'own-7b',   name:'Owned Server · 7B/8B',        sub:'Buy hardware · one-time', cat:'server',tag:'tag-server',
+      get monthly(){ return calcElec(450) }, setup:110000, hardware:'1× RTX 4090 24GB · 64 GB RAM',
+      privacy:'high', privacyLabel:'Highest · On-premise', accuracy:67, maxUsers:'8–10',
+      watts:450, capex:110000,
+      specs:[['One-time hardware','฿110,000'],['Models','Llama 8B, Qwen 7B'],['Power draw','~450W avg'],['Best for','Small teams']]},
+    {id:'own-14b',  name:'Owned Server · DeepSeek-R1 14B',sub:'Buy hardware · one-time', cat:'server',tag:'tag-server',
+      get monthly(){ return calcElec(450) }, setup:180000, hardware:'1× RTX 4090 24GB · 128 GB RAM',
+      privacy:'high', privacyLabel:'Highest · On-premise', accuracy:75, maxUsers:'6–10',
+      watts:450, capex:180000,
+      specs:[['One-time hardware','฿180,000'],['Models','DeepSeek-R1 14B, Qwen 14B'],['Power draw','~450W avg'],['Best for','Sensitive daily use']]},
+    {id:'own-47b',  name:'Owned Server · DeepSeek-R1 47B',sub:'Buy hardware · one-time', cat:'server',tag:'tag-server',
+      get monthly(){ return calcElec(900) }, setup:720000, hardware:'2× A6000 48GB · 256 GB RAM',
+      privacy:'high', privacyLabel:'Highest · On-premise', accuracy:83, maxUsers:'5–8',
+      watts:900, capex:720000,
+      specs:[['One-time hardware','฿720,000'],['Models','DeepSeek-R1 47B, Mixtral 8×7B'],['Power draw','~900W avg'],['Best for','Regulated industries']]},
+    {id:'own-70b',  name:'Owned Server · Llama 70B',    sub:'Buy hardware · one-time', cat:'server',tag:'tag-server',
+      get monthly(){ return calcElec(1200) }, setup:1800000, hardware:'2× A100 80GB · 512 GB RAM',
+      privacy:'high', privacyLabel:'Highest · On-premise', accuracy:86, maxUsers:'4–6',
+      watts:1200, capex:1800000,
+      specs:[['One-time hardware','฿1,800,000'],['Models','Llama 3.3 70B, Qwen 72B'],['Power draw','~1,200W avg'],['Best for','Best open quality on-prem']]},
+  ];
+}
+
+let OPTIONS = buildOptions();
+let state = {cards:{cat:'all',sort:'price'}, chart:{cat:'all',period:'monthly',view:'bar'}, table:{cat:'all'}};
+
+// ============================================================
+// COST BREAKDOWN HTML (server / dgx cards)
+// ============================================================
+function breakdownHTML(o){
+  if(o.cat!=='server' && o.cat!=='dgx') return '';
+  const watts = o.watts || (o.cat==='dgx' ? 170 : 0);
+  const elec  = calcElec(watts);
+  const kWh   = Math.round(watts * 24 * 30 / 1000);
+  return `
+  <div class="cost-breakdown">
+    <div class="cost-breakdown-title">Monthly running cost — electricity only</div>
+    <div class="cost-row">
+      <div class="cost-row-label">
+        <div class="cost-row-label-main"><span class="cost-icon" style="color:#ff6b35">⚡</span>Electricity</div>
+        <div class="cost-row-formula">${watts}W × 24h × 30d ÷ 1,000 = ${kWh} kWh/mo × ฿${inputs.elecRate}/kWh</div>
+      </div>
+      <span class="cost-row-val">฿${elec.toLocaleString()}</span>
+    </div>
+    <div class="cost-row total">
+      <span class="cost-row-label" style="flex-direction:row;align-items:center">Total monthly</span>
+      <span class="cost-row-val">฿${elec.toLocaleString()}</span>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ink-muted);margin-top:8px">Admin absorbed by existing IT staff (฿0 additional)</div>
+  </div>`;
+}
+
+// ============================================================
+// DGX CONCURRENT USER DOTS
+// ============================================================
+function dgxUsersHTML(o){
+  if(!o.dgx) return '';
+  // DGX Spark = ONE physical device. User picks which model to load.
+  // Concurrent users = (128 GB - model size) / 1.5 GB per user KV cache
+  const models = [
+    {size:'7B',  name:'Llama 8B / Qwen 7B',             vram:16,  tok:180, prec:'FP16'},
+    {size:'14B', name:'DeepSeek-R1 14B / Qwen 14B',     vram:28,  tok:130, prec:'FP16'},
+    {size:'70B', name:'Llama 3.3 70B / DeepSeek-R1 70B',vram:140, tok:40,  prec:'FP16 (fits! 128 GB)'},
+  ];
+  const rows = models.map(m=>{
+    const kvLeft  = 128 - m.vram;
+    const users   = Math.max(1, Math.min(10, Math.floor(kvLeft / 1.5)));
+    const dots    = Array.from({length:10},(_,i)=>`<div class="dgx-dot${i>=users?' dim':''}"></div>`).join('');
+    const userClr = users>=8?'var(--good)':users>=5?'var(--warn)':'var(--danger)';
+    return `
+    <tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <td style="padding:10px 12px 10px 0;vertical-align:top">
+        <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink)">${m.size} model</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--ink-muted);margin-top:3px">${m.name}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent-3);margin-top:2px">${m.prec} · ${m.vram} GB weights</div>
+      </td>
+      <td style="padding:10px 8px;vertical-align:middle;text-align:center">
+        <div style="font-family:var(--serif);font-size:24px;font-weight:800;color:${userClr};line-height:1">${users}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--ink-muted);margin-top:2px">users at once</div>
+      </td>
+      <td style="padding:10px 0 10px 8px;vertical-align:middle">
+        <div class="dgx-user-dots" style="flex-wrap:wrap;gap:3px">${dots}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--ink-muted);margin-top:4px">~${m.tok} tok/s · ${kvLeft} GB free for context</div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="dgx-users">
+    <div class="dgx-users-title">⚠ This is ONE device — you load ONE model at a time</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ink-muted);margin-bottom:12px;line-height:1.5">
+      The DGX Spark has <b style="color:var(--ink)">128 GB unified memory</b>. You choose which AI model to load. Bigger model = smarter AI but fewer users at the same time. Smaller model = more users, slightly less intelligent.
+    </div>
+    <table style="width:100%;min-width:unset;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid var(--accent)">
+          <th style="text-align:left;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-muted);padding:0 12px 8px 0">Model you load</th>
+          <th style="text-align:center;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-muted);padding:0 8px 8px">Max users</th>
+          <th style="text-align:left;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-muted);padding:0 0 8px 8px">Capacity & speed</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ink-muted);margin-top:10px;line-height:1.5;border-top:1px dashed var(--line);padding-top:8px">
+      Formula: (128 GB − model weight size) ÷ 1.5 GB per user = max simultaneous users
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// RENDER CARDS
+// ============================================================
+function renderCards(){
+  let data = OPTIONS;
+  if(state.cards.cat!=='all') data = data.filter(o=>o.cat===state.cards.cat);
+  data = [...data];
+  if(state.cards.sort==='price')    data.sort((a,b)=>a.monthly-b.monthly);
+  if(state.cards.sort==='accuracy') data.sort((a,b)=>b.accuracy-a.accuracy);
+  if(state.cards.sort==='privacy')  data.sort((a,b)=>privacyVal(b.privacy)-privacyVal(a.privacy)||a.monthly-b.monthly);
+  document.getElementById('optCount').textContent = `Showing ${data.length} of ${OPTIONS.length} options`;
+
+  document.getElementById('optionCards').innerHTML = data.map(o=>{
+    const pCls = o.privacy==='high'?'p-high':o.privacy==='mid'?'p-mid':'p-low';
+    const isOwned = o.cat==='server'||o.cat==='dgx';
+    return `<div class="card${o.dgx?' dgx-highlight':''}">
+      <span class="card-tag ${o.tag}">${catLabel(o.cat)}</span>
+      <div class="card-name">${o.name}</div>
+      <div class="card-sub">${o.sub}</div>
+      ${o.warning?`<div class="card-warning"><b>⚠ Not suitable for 10 concurrent users</b>${o.warning}</div>`:''}
+      ${isOwned?`<div class="onetime-badge">
+        <div><div class="ot-amount">฿${o.setup.toLocaleString()}</div></div>
+        <div class="ot-label">One-time purchase<br>No loan · No amortisation</div>
+      </div>`:''}
+      <div class="card-price">฿${o.monthly.toLocaleString()}<small> /mo</small></div>
+      <div class="card-price-sub">${isOwned?'Electricity only — hardware paid · admin absorbed by IT staff':'No setup cost'}</div>
+      ${dgxUsersHTML(o)}
+      ${breakdownHTML(o)}
+      <div class="accuracy-bar">
+        <div class="accuracy-label"><span>Accuracy</span><span>${o.accuracy}/100</span></div>
+        <div class="accuracy-track"><div class="accuracy-fill" style="width:${o.accuracy}%"></div></div>
+      </div>
+      <div class="card-specs">
+        ${o.specs.map(s=>`<div class="spec-row"><span class="spec-label">${s[0]}</span><span class="spec-val">${s[1]}</span></div>`).join('')}
+        <div class="spec-row"><span class="spec-label">Max concurrent</span><span class="spec-val">${o.maxUsers}</span></div>
+      </div>
+      <div class="privacy-bar">
+        <div class="privacy-dot ${pCls}"></div>
+        <div class="privacy-text"><b>Privacy</b>${o.privacyLabel}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// RENDER TABLE
+// ============================================================
+function renderTable(){
+  let data = OPTIONS;
+  if(state.table.cat!=='all') data = data.filter(o=>o.cat===state.table.cat);
+  data = [...data].sort((a,b)=>a.monthly-b.monthly);
+  document.getElementById('tableBody').innerHTML = data.map(o=>{
+    const pCls = 'pill-'+(o.privacy==='high'?'high':o.privacy==='mid'?'mid':'low');
+    const isOwned = o.cat==='server'||o.cat==='dgx';
+    const watts = o.watts || 0;
+    const elec  = isOwned ? calcElec(watts) : null;
+    return `<tr${o.dgx?' class="dgx-row"':''}>
+      <td class="name">${o.name}<small>${o.sub}</small></td>
+      <td><span class="pill pill-cat-${o.cat}">${catLabel(o.cat)}</span></td>
+      <td>${o.hardware}${o.warning?` <span style="color:var(--danger);font-size:10px">⚠</span>`:''}</td>
+      <td class="num">${o.setup>0?'฿'+o.setup.toLocaleString():'—'}</td>
+      <td class="num">${isOwned?'฿'+elec.toLocaleString():'—'}</td>
+      <td class="num"><b>฿${o.monthly.toLocaleString()}</b></td>
+      <td class="num">฿${(o.monthly*12).toLocaleString()}</td>
+      <td><span class="pill ${pCls}">${privacyTxt(o.privacy)}</span></td>
+      <td><div class="acc-mini"><span class="acc-mini-track"><span class="acc-mini-fill" style="width:${o.accuracy}%;display:block"></span></span><span class="acc-num">${o.accuracy}</span></div></td>
+      <td style="font-family:var(--mono);font-size:12px">${o.maxUsers}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// RENDER DGX MODELS TABLE
+// ============================================================
+function renderDgxModels(){
+  document.getElementById('dgxModelBody').innerHTML = DGX_MODELS.map(r=>{
+    const kvLeft = 128 - r.vram;
+    const concurrent = r.vram>124 ? 0 : Math.max(1,Math.min(10,Math.floor(kvLeft/1.5)));
+    const tokPer10   = concurrent>0 ? Math.round(r.tokSingle/concurrent) : 0;
+    const suitable   = concurrent>=10?'✅ Yes':concurrent>=6?'⚠ Partial ('+concurrent+')':concurrent>=1?'❌ No ('+concurrent+' users)':'❌ Cannot fit';
+    return `<tr>
+      <td class="name">${r.model}${r.note?`<small>${r.note}</small>`:''}</td>
+      <td style="font-family:var(--mono)">${r.prec}</td>
+      <td style="font-family:var(--mono)">${r.vram} GB</td>
+      <td style="font-family:var(--mono);color:${kvLeft<4?'var(--danger)':'var(--ink-dim)'}">${kvLeft>0?kvLeft+' GB':'—'}</td>
+      <td style="font-family:var(--mono);font-weight:600;color:${concurrent>=6?'var(--good)':concurrent>=3?'var(--warn)':'var(--danger)'}">
+        ${concurrent===0?'Cannot run':concurrent+' users'}
+      </td>
+      <td style="font-family:var(--mono)">${r.tokSingle} tok/s</td>
+      <td style="font-family:var(--mono)">${tokPer10>0?'~'+tokPer10+' tok/s':'—'}</td>
+      <td><div class="acc-mini"><span class="acc-mini-track"><span class="acc-mini-fill" style="width:${r.acc}%;display:block"></span></span><span class="acc-num">${r.acc}</span></div></td>
+      <td>${suitable}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// RENDER SERVER SPECS TABLE
+// ============================================================
+function renderServerSpecs(){
+  const rows = [
+    {label:'DGX Spark',       sub:'NVIDIA GB10 Blackwell', gpu:'GB10 Superchip',   vram:'128 GB unified',  ram:'128 GB shared', capex:175000, watts:170,  acc:87, maxU:'Up to 10 (7B) · 6 (14B) · 1 (70B)'},
+    {label:'Dell R6615',      sub:'EPYC 9124 (app server)',gpu:'None (CPU-only)',   vram:'—',               ram:'16 GB',         capex:DELL_CAPEX,                    watts:300,  acc:75, maxU:'N/A — no AI models'},
+    {label:'7B Server',       sub:'RTX 4090',              gpu:'1× RTX 4090 24GB', vram:'24 GB',           ram:'64 GB',         capex:110000,                        watts:450,  acc:67, maxU:'8–10'},
+    {label:'14B Server',      sub:'RTX 4090',              gpu:'1× RTX 4090 24GB', vram:'24 GB',           ram:'128 GB',        capex:180000,                        watts:450,  acc:75, maxU:'6–10'},
+    {label:'47B Server',      sub:'2× A6000',              gpu:'2× A6000 48GB',    vram:'96 GB',           ram:'256 GB',        capex:720000,                        watts:900,  acc:83, maxU:'5–8'},
+    {label:'70B Server',      sub:'2× A100',               gpu:'2× A100 80GB',     vram:'160 GB',          ram:'512 GB',        capex:1800000,                       watts:1200, acc:86, maxU:'4–6'},
+  ];
+  document.getElementById('serverSpecsBody').innerHTML = rows.map(r=>{
+    const elec = calcElec(r.watts);
+    const kWh  = Math.round(r.watts*24*30/1000);
+    return `<tr>
+      <td class="name">${r.label}<small>${r.sub}</small></td>
+      <td>${r.gpu}</td><td>${r.vram}</td><td>${r.ram}</td>
+      <td class="num">฿${r.capex.toLocaleString()}</td>
+      <td class="num">${r.watts}W avg (${kWh} kWh/mo)</td>
+      <td class="num">฿${elec.toLocaleString()}</td>
+      <td><div class="acc-mini"><span class="acc-mini-track"><span class="acc-mini-fill" style="width:${r.acc}%;display:block"></span></span><span class="acc-num">${r.acc}</span></div></td>
+      <td style="font-family:var(--mono);font-size:12px">${r.maxU}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// RENDER BUDGET PICKS
+// ============================================================
+function renderBudgetPicks(){
+  const tiers = [
+    {key:'b1',min:0,    max:5000,    label:'Under ฿5,000/mo',        name:'Shoestring', why:'Cheapest path to AI. Best here is the <em>EU-hosted GDPR API</em> — no setup, solid quality, good privacy.'},
+    {key:'b2',min:5000, max:12000,   label:'฿5,000 – ฿12,000/mo',   name:'Lean',       why:'Best <em>price-per-quality</em>. Frontier model, per-seat billing, zero infrastructure needed.'},
+    {key:'b3',min:12000,max:20000,   label:'฿12,000 – ฿20,000/mo',  name:'Standard',   why:'Finished <em>frontier SaaS</em> — full quality, paid monthly, no engineering or servers.'},
+    {key:'b4',min:20000,max:50000,   label:'฿20,000 – ฿50,000/mo',  name:'Mid-market', why:'<em>Owned on-premise</em> — buy hardware once, then only electricity monthly. Data never leaves.'},
+    {key:'b5',min:50000,max:150000,  label:'฿50,000 – ฿150,000/mo', name:'Premium',    why:'High-throughput <em>private cloud GPU</em> — strong model, pause when not in use.'},
+    {key:'b6',min:150000,max:Infinity,label:'฿150,000+ /mo',          name:'Enterprise', why:'No compromise — <em>frontier open-source quality</em> with full data sovereignty.'},
+  ];
+  document.getElementById('budgetPicks').innerHTML = tiers.map(t=>{
+    const eligible = OPTIONS.filter(o=>o.monthly<=t.max && o.monthly>=t.min && !o.warning);
+    const best = [...eligible].sort((a,b)=>{
+      if(b.accuracy!==a.accuracy) return b.accuracy-a.accuracy;
+      if(privacyVal(b.privacy)!==privacyVal(a.privacy)) return privacyVal(b.privacy)-privacyVal(a.privacy);
+      return a.monthly-b.monthly;
+    })[0];
+    if(!best) return `<div class="budget-row ${t.key}">
+      <div class="budget-range">${t.name}<b>${t.label}</b></div>
+      <div class="budget-pick"><h4 style="color:var(--ink-muted)">No option in this band</h4><p>Adjust FX or electricity rate to move options into this range.</p></div>
+      <div class="budget-meta"></div></div>`;
+    const isOwned = best.cat==='server'||best.cat==='dgx';
+    return `<div class="budget-row ${t.key}">
+      <div class="budget-range">${t.name}<b>${t.label}</b></div>
+      <div class="budget-pick"><h4>${best.name}</h4><p>${t.why}</p></div>
+      <div class="budget-meta">
+        ${best.setup>0?`<div>One-time · <b>฿${best.setup.toLocaleString()}</b></div>`:''}
+        <div>Monthly · <b>฿${best.monthly.toLocaleString()}</b></div>
+        ${isOwned?`<div>Electricity · <b>฿${calcElec(best.watts||170).toLocaleString()}</b></div>`:''}
+        <div>Annual · <b>฿${(best.monthly*12).toLocaleString()}</b></div>
+        <div>Accuracy · <b>${best.accuracy}/100</b></div>
+        <div>Privacy · <b>${privacyTxt(best.privacy)}</b></div>
+        <div>Max users · <b>${best.maxUsers}</b></div>
+      </div></div>`;
+  }).join('');
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+let mainChart, scatterAcc, scatterPriv, breakEvenChart;
+
+function renderMainChart(){
+  let data = OPTIONS;
+  if(state.chart.cat!=='all') data = data.filter(o=>o.cat===state.chart.cat);
+  const sorted = [...data].sort((a,b)=>a.monthly-b.monthly);
+  const ctx = document.getElementById('mainChart');
+  if(mainChart) mainChart.destroy();
+
+  if(state.chart.view==='stacked'){
+    const owned = OPTIONS.filter(o=>o.cat==='server'||o.cat==='dgx').sort((a,b)=>a.monthly-b.monthly);
+    mainChart = new Chart(ctx,{type:'bar',
+      data:{labels:owned.map(o=>o.name),datasets:[
+        {label:'Electricity/mo',data:owned.map(o=>calcElec(o.watts||170)/1000),backgroundColor:'#ff6b35',borderRadius:2},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'#0d0e10',borderColor:'#d4ff3a',borderWidth:1,
+            callbacks:{label:c=>{const o=owned[c.dataIndex];const w=o.watts||170;const kWh=Math.round(w*24*30/1000);return [`฿${(c.raw*1000).toLocaleString()}/mo`,`${w}W avg · ${kWh} kWh/mo`,`@ ฿${inputs.elecRate}/kWh`];}}}
+        },
+        scales:{x:{grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono',size:10},callback:v=>'฿'+v+'k'}},
+                y:{grid:{display:false},ticks:{color:'#b6ada0',font:{family:'Inter Tight',size:11}}}}
+      }
+    });
+    document.getElementById('chartTitle').textContent='Owned server monthly electricity cost';
+    document.getElementById('chartUnit').textContent='thousand THB';
+    return;
+  }
+  if(state.chart.view==='line'){
+    const years=[0,1,2,3,4,5];
+    mainChart=new Chart(ctx,{type:'line',
+      data:{labels:years.map(y=>'Year '+y),datasets:sorted.map(o=>({
+        label:o.name,data:years.map(y=>(o.setup+o.monthly*12*y)/1000),
+        borderColor:COLORS[o.cat],backgroundColor:COLORS[o.cat]+'22',
+        borderWidth:2,tension:.15,pointRadius:3,pointHoverRadius:6
+      }))},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'right',labels:{color:'#b6ada0',font:{family:'JetBrains Mono',size:9},boxWidth:10,padding:6}},
+          tooltip:{backgroundColor:'#0d0e10',borderColor:'#d4ff3a',borderWidth:1,callbacks:{label:c=>`${c.dataset.label}: ฿${(c.raw*1000).toLocaleString()}`}}},
+        scales:{x:{grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono'}}},
+                y:{grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono'},callback:v=>'฿'+v+'k'}}}
+      }
+    });
+    document.getElementById('chartTitle').textContent='5-year total cost (one-time + monthly × years)';
+    document.getElementById('chartUnit').textContent='cumulative thousand THB';
+    return;
+  }
+  const values=state.chart.period==='monthly'?sorted.map(o=>o.monthly/1000):sorted.map(o=>o.monthly*12/1000);
+  mainChart=new Chart(ctx,{type:'bar',
+    data:{labels:sorted.map(o=>o.name),datasets:[{label:'THB (k)',data:values,backgroundColor:sorted.map(o=>COLORS[o.cat]),borderWidth:0,borderRadius:2,maxBarThickness:30}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'#0d0e10',borderColor:'#d4ff3a',borderWidth:1,
+          titleFont:{family:'JetBrains Mono',size:11},bodyFont:{family:'Inter Tight',size:13},padding:12,
+          callbacks:{label:c=>{
+            const o=sorted[c.dataIndex];const val=state.chart.period==='monthly'?o.monthly:o.monthly*12;
+            const lines=[`฿${val.toLocaleString()}`,`Max users: ${o.maxUsers}`,`Accuracy: ${o.accuracy}/100`,`Privacy: ${privacyTxt(o.privacy)}`];
+            if(o.cat==='server'||o.cat==='dgx') lines.push(`  ⚡ Electricity: ฿${calcElec(o.watts||170).toLocaleString()}/mo`,`  Hardware (one-time): ฿${o.setup.toLocaleString()}`);
+            if(o.warning) lines.push(`⚠ ${o.warning}`);
+            return lines;
+          }}}},
+      scales:{x:{grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono',size:10},callback:v=>'฿'+v+'k'}},
+              y:{grid:{display:false},ticks:{color:'#b6ada0',font:{family:'Inter Tight',size:11}}}}
+    }
+  });
+  document.getElementById('chartTitle').textContent=(state.chart.period==='monthly'?'Monthly cost':'Annual cost')+' — '+(state.chart.cat==='all'?'all options':catLabel(state.chart.cat));
+  document.getElementById('chartUnit').textContent='in thousand THB';
+}
+
+function renderScatters(){
+  const makeDs=fn=>OPTIONS.map(o=>({label:o.name,data:[fn(o)],backgroundColor:COLORS[o.cat],borderColor:COLORS[o.cat],pointRadius:8,pointHoverRadius:12,pointStyle:'rectRot'}));
+  if(scatterAcc) scatterAcc.destroy();
+  scatterAcc=new Chart(document.getElementById('scatterAcc'),{type:'scatter',data:{datasets:makeDs(o=>({x:o.monthly/1000,y:o.accuracy,name:o.name}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d0e10',borderColor:'#d4ff3a',borderWidth:1,callbacks:{label:c=>`${c.raw.name}: ฿${(c.raw.x*1000).toLocaleString()}/mo · ${c.raw.y}/100`}}},
+      scales:{x:{type:'logarithmic',title:{display:true,text:'Monthly THB (k, log)',color:'#7a7468',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono'}}},
+              y:{min:50,max:100,title:{display:true,text:'Accuracy (0–100)',color:'#7a7468',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono'}}}}}});
+  if(scatterPriv) scatterPriv.destroy();
+  scatterPriv=new Chart(document.getElementById('scatterPriv'),{type:'scatter',data:{datasets:makeDs(o=>({x:o.monthly/1000,y:privacyVal(o.privacy),name:o.name}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d0e10',borderColor:'#d4ff3a',borderWidth:1,callbacks:{label:c=>`${c.raw.name}: ฿${(c.raw.x*1000).toLocaleString()}/mo`}}},
+      scales:{x:{type:'logarithmic',title:{display:true,text:'Monthly THB (k, log)',color:'#7a7468',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono'}}},
+              y:{min:0.5,max:3.5,title:{display:true,text:'Privacy',color:'#7a7468',font:{family:'JetBrains Mono',size:10}},grid:{color:'#2c3137'},ticks:{stepSize:1,color:'#7a7468',font:{family:'JetBrains Mono'},callback:v=>v===1?'Low':v===2?'Medium':v===3?'High':''}}}}});
+}
+
+// ============================================================
+// INVOICE
+// ============================================================
+function renderInvoice(){
+  const fx = inputs.fxUsd;
+  document.getElementById('invoiceBody').innerHTML = [
+    ...INVOICE.map(r=>`
+      <tr>
+        <td style="font-weight:600;color:var(--ink)">${r.service}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--ink-muted)">${r.period}</td>
+        <td class="num">$${r.usd.toFixed(2)}</td>
+        <td class="num" style="color:var(--ink-muted)">$0.00</td>
+        <td class="num">$${r.usd.toFixed(2)}</td>
+        <td class="num" style="color:var(--accent);font-weight:600">฿${Math.round(r.usd*fx).toLocaleString()}</td>
+      </tr>`),
+    `<tr style="border-top:2px solid var(--accent);background:var(--bg-2)">
+      <td colspan="2" style="text-align:right;font-weight:700;color:var(--ink);padding:14px 15px">Total</td>
+      <td class="num" style="font-weight:700">$${INVOICE_TOTAL_USD.toFixed(2)}</td>
+      <td class="num">$0.00</td>
+      <td class="num" style="font-weight:700">$${INVOICE_TOTAL_USD.toFixed(2)}</td>
+      <td class="num" style="color:var(--accent);font-weight:800;font-size:15px">฿${Math.round(INVOICE_TOTAL_USD*fx).toLocaleString()}</td>
+    </tr>`
+  ].join('');
+
+  const monthly=Math.round(INVOICE_TOTAL_USD*fx), annual=monthly*12;
+  document.getElementById('invoiceSummaryCards').innerHTML=[
+    {label:'Monthly (USD)',     val:'$'+INVOICE_TOTAL_USD.toFixed(2), sub:'April 2026 invoice'},
+    {label:'Monthly (THB)',     val:'฿'+monthly.toLocaleString(),      sub:'at ฿'+fx+'/USD'},
+    {label:'Annual (THB est.)', val:'฿'+annual.toLocaleString(),       sub:'12 × monthly'},
+    {label:'3-year total',      val:'฿'+(annual*3).toLocaleString(),   sub:'no hardware needed'},
+  ].map(c=>`
+    <div style="background:var(--panel);border:1px solid var(--line);padding:20px">
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-muted);margin-bottom:8px">${c.label}</div>
+      <div style="font-family:var(--serif);font-size:28px;font-weight:800;color:var(--accent);letter-spacing:-.02em">${c.val}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-top:4px">${c.sub}</div>
+    </div>`).join('');
+}
+
+// ============================================================
+// DELL SPEC TABLE (static, no recalc needed)
+// ============================================================
+function renderDellSpec(){
+  document.getElementById('dellSpecBody').innerHTML = DELL_SPECS.map(r=>`
+    <tr style="border-bottom:1px solid var(--line)">
+      <td style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);padding:7px 12px 7px 0;white-space:nowrap;vertical-align:top">${r.k}</td>
+      <td style="font-size:12px;color:${r.k==='GPU'?'var(--danger)':'var(--ink-dim)'};padding:7px 0;line-height:1.5">${r.v}</td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// DELL COSTS (recalculates with elecRate)
+// ============================================================
+function renderDellCosts(){
+  const watts=DELL_WATTS, kWh=Math.round(watts*24*30/1000), elec=calcElec(watts);
+  const annual=elec*12, total3yr=DELL_CAPEX+annual*3, avgMonthly=Math.round(total3yr/36);
+  document.getElementById('dellElecCalc').innerHTML=
+    `${watts}W × 24h × 30d ÷ 1,000 = <b style="color:var(--ink)">${kWh} kWh/month</b><br>`+
+    `${kWh} kWh × ฿${inputs.elecRate}/kWh = <b style="color:var(--accent-2)">฿${elec.toLocaleString()}/month</b>`;
+  document.getElementById('dellElecMonthly').textContent='฿'+elec.toLocaleString();
+  document.getElementById('dellElecAnnual').textContent='฿'+annual.toLocaleString();
+  document.getElementById('dell3yr').textContent='฿'+total3yr.toLocaleString();
+  document.getElementById('dellAvgMonthly').textContent='฿'+avgMonthly.toLocaleString();
+}
+
+// ============================================================
+// CLOUD vs DELL COMPARISON
+// ============================================================
+function renderComparison(){
+  const fx=inputs.fxUsd;
+  const cloudMonthly=Math.round(INVOICE_TOTAL_USD*fx);
+  const dellElec=calcElec(DELL_WATTS);
+  const diff=cloudMonthly-dellElec;
+  const breakEvenMonths=diff>0 ? Math.ceil(DELL_CAPEX/diff) : Infinity;
+  const breakEvenYears=(breakEvenMonths/12).toFixed(1);
+  const cloud3yr=cloudMonthly*36, dell3yr=DELL_CAPEX+dellElec*36;
+  const saving3yr=cloud3yr-dell3yr;
+  const cloud5yr=cloudMonthly*60, dell5yr=DELL_CAPEX+dellElec*60;
+  const saving5yr=cloud5yr-dell5yr;
+
+  // summary cards
+  document.getElementById('comparisonCards').innerHTML=[
+    {label:'Cloud monthly (THB)',    val:'฿'+cloudMonthly.toLocaleString(),                               sub:'$'+INVOICE_TOTAL_USD+' × ฿'+fx+'/USD',               color:'var(--accent-2)'},
+    {label:'Dell electricity/mo',    val:'฿'+dellElec.toLocaleString(),                                   sub:DELL_WATTS+'W × 720h × ฿'+inputs.elecRate+'/kWh',       color:'var(--accent)'},
+    {label:'Monthly saving (Dell)',  val:'฿'+Math.abs(diff).toLocaleString(),                             sub:diff>0?'saved each month after break-even':'cloud is cheaper/month', color:diff>0?'var(--good)':'var(--danger)'},
+    {label:'Break-even point',       val:breakEvenMonths===Infinity?'Never':breakEvenMonths+' months',    sub:breakEvenMonths===Infinity?'Dell elec ≥ cloud cost':breakEvenYears+' years from purchase', color:'var(--accent-3)'},
+    {label:'3-year cloud total',     val:'฿'+cloud3yr.toLocaleString(),                                   sub:'36 months × ฿'+cloudMonthly.toLocaleString(),           color:'var(--accent-2)'},
+    {label:'3-year Dell total',      val:'฿'+dell3yr.toLocaleString(),                                    sub:'฿'+DELL_CAPEX.toLocaleString()+' + elec×36',            color:'var(--accent)'},
+    {label:'3-year net',             val:(saving3yr>=0?'Save ':'Lose ')+'฿'+Math.abs(saving3yr).toLocaleString(), sub:saving3yr>=0?'by choosing Dell':'cloud saves money over 3yr', color:saving3yr>=0?'var(--good)':'var(--danger)'},
+    {label:'5-year net',             val:(saving5yr>=0?'Save ':'Lose ')+'฿'+Math.abs(saving5yr).toLocaleString(), sub:saving5yr>=0?'if hardware lasts 5 years':'cloud cheaper even at 5yr', color:saving5yr>=0?'var(--good)':'var(--danger)'},
+  ].map(c=>`
+    <div style="background:var(--panel);border:1px solid var(--line);padding:18px 20px">
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-muted);margin-bottom:6px">${c.label}</div>
+      <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:${c.color};letter-spacing:-.01em">${c.val}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--ink-muted);margin-top:4px">${c.sub}</div>
+    </div>`).join('');
+
+  // pro/con lists
+  const li = t => `<li style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">${t}</li>`;
+  document.getElementById('cloudPros').innerHTML=[
+    '✅ Zero upfront cost — pay as you go monthly',
+    '✅ Scale CPU/RAM/storage up or down in minutes',
+    '✅ No physical hardware to manage or replace',
+    '✅ Built-in redundancy — Hetzner handles hardware failures',
+    '✅ Geographic redundancy available (multiple Hetzner DCs)',
+    '✅ Automated snapshots and backup features built-in',
+    '✅ No physical space, cooling, or power infrastructure needed',
+    '✅ Easy disaster recovery — clone environment in another region',
+  ].map(li).join('');
+
+  document.getElementById('dellPros').innerHTML=[
+    `✅ Monthly cost = just electricity (฿${dellElec.toLocaleString()}) after purchase`,
+    `✅ Break-even in ~${breakEvenYears} years — then massively cheaper forever`,
+    '✅ Full data sovereignty — nothing leaves your premises',
+    '✅ No FX risk — electricity is in Thai Baht, not USD',
+    '✅ 3-year ProSupport warranty with 4-hour onsite service',
+    '✅ EPYC 9124 16C/32T handles all 3 current workloads comfortably',
+    '✅ No vendor lock-in — you own the hardware outright',
+    '✅ iDRAC9 remote management — manage without physical access',
+  ].map(li).join('');
+
+  document.getElementById('cloudCons').innerHTML=[
+    `❌ ฿${cloudMonthly.toLocaleString()}/month ongoing — never stops, never owned`,
+    `❌ 3-year cost: ฿${cloud3yr.toLocaleString()} with nothing to show for it`,
+    '❌ FX risk — cost rises when USD strengthens vs THB',
+    '❌ Data lives on Hetzner servers in Germany (foreign jurisdiction)',
+    '❌ Vendor lock-in — migration costs time and effort if pricing rises',
+    '❌ Costs scale up as workload grows',
+  ].map(li).join('');
+
+  document.getElementById('dellCons').innerHTML=[
+    `❌ ฿${DELL_CAPEX.toLocaleString()} cash required upfront today`,
+    `❌ Break-even takes ${breakEvenYears} years — cash tied up until then`,
+    '❌ No GPU — cannot run AI models (need separate GPU server for LLMs)',
+    '❌ Only 16 GB RAM — must verify current Hetzner RAM usage first',
+    '❌ Physical space and cooling required in your office/DC',
+    '❌ Single location — no geographic redundancy without a second unit',
+    '❌ IT team owns all OS patches, hardware failures, and backups',
+    '❌ After 5–7 years hardware becomes outdated, needs replacement',
+  ].map(li).join('');
+
+  // verdict
+  document.getElementById('verdictText').innerHTML = saving3yr>=0
+    ? `<strong style="color:var(--good)">At ฿${fx}/USD, buying the Dell PowerEdge R6615 saves ฿${saving3yr.toLocaleString()} over 3 years</strong> vs staying on Hetzner cloud. Break-even is <strong>${breakEvenMonths} months (${breakEvenYears} years)</strong>. After that, your monthly cost drops from <strong>฿${cloudMonthly.toLocaleString()}</strong> to just <strong>฿${dellElec.toLocaleString()}</strong>/month — a saving of <strong>฿${diff.toLocaleString()}/month</strong>.<br><br>
+    <strong>Before migrating, verify:</strong> (1) Your Hetzner projects' current RAM usage — the Dell only has 16 GB. (2) Whether you need the Hetzner geographic redundancy. (3) The Dell has <em>no GPU</em> — AI inference costs remain separate on a GPU server.`
+    : `<strong style="color:var(--warn)">At ฿${fx}/USD, the Dell does NOT save money over 3 years.</strong> The electricity alone (฿${dellElec.toLocaleString()}/mo) is close to your cloud bill. Consider staying on Hetzner, or check the 5-year figure above.`;
+
+  // break-even chart
+  const months=Array.from({length:61},(_,i)=>i);
+  if(breakEvenChart) breakEvenChart.destroy();
+  breakEvenChart=new Chart(document.getElementById('breakEvenChart'),{type:'line',
+    data:{labels:months.map(m=>m===0?'Now':'Mo '+m),
+      datasets:[
+        {label:'Cloud cumulative',data:months.map(m=>cloudMonthly*m/1000),borderColor:'#ff6b35',backgroundColor:'rgba(255,107,53,.1)',borderWidth:2.5,tension:.1,pointRadius:0,fill:false},
+        {label:'Dell cumulative', data:months.map(m=>(DELL_CAPEX+dellElec*m)/1000),borderColor:'#d4ff3a',backgroundColor:'rgba(212,255,58,.08)',borderWidth:2.5,tension:.1,pointRadius:0,fill:false},
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top',labels:{color:'#b6ada0',font:{family:'JetBrains Mono',size:11},boxWidth:14,padding:16}},
+        tooltip:{backgroundColor:'#0d0e10',borderColor:'#d4ff3a',borderWidth:1,
+          callbacks:{
+            label:c=>`${c.dataset.label}: ฿${(c.raw*1000).toLocaleString()}`,
+            afterBody:ctx=>{const m=ctx[0].dataIndex;if(m===0)return[];const d=(cloudMonthly*m)-(DELL_CAPEX+dellElec*m);return[d>0?`→ Dell saves ฿${d.toLocaleString()} so far`:`→ Cloud saves ฿${Math.abs(d).toLocaleString()} so far`];}
+          }
+        }
+      },
+      scales:{
+        x:{grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono',size:10},callback:(v,i)=>i%6===0?(i===0?'Now':'Mo '+i):''}},
+        y:{grid:{color:'#2c3137'},ticks:{color:'#7a7468',font:{family:'JetBrains Mono',size:10},callback:v=>'฿'+v+'k'}}
+      }
+    }
+  });
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll(){
+  OPTIONS = buildOptions();
+  renderCards();
+  renderTable();
+  renderBudgetPicks();
+  renderMainChart();
+  renderScatters();
+  renderServerSpecs();
+  renderDgxModels();
+  renderInvoice();
+  renderDellCosts();
+  renderComparison();
+}
+
+// ============================================================
+// FILTER / TOGGLE EVENTS
+// ============================================================
+function setupGroup(id,attr,bag,key,cb){
+  document.getElementById(id).addEventListener('click',e=>{
+    const v=e.target.dataset[attr]; if(!v) return;
+    document.querySelectorAll(`#${id} .filter-btn,#${id} .toggle-btn`).forEach(b=>b.classList.remove('active'));
+    e.target.classList.add('active'); bag[key]=v; cb();
+  });
+}
+setupGroup('cardFilters','cat',state.cards,'cat',renderCards);
+setupGroup('sortToggle', 'sort',state.cards,'sort',renderCards);
+setupGroup('chartFilters','cat',state.chart,'cat',renderMainChart);
+setupGroup('periodToggle','period',state.chart,'period',renderMainChart);
+setupGroup('viewToggle',  'view',state.chart,'view',renderMainChart);
+setupGroup('tableFilters','cat',state.table,'cat',renderTable);
+
+// ============================================================
+// INPUT EVENTS — single unified handler
+// ============================================================
+[
+  ['fxUsd',      v=>inputs.fxUsd=v],
+  ['fxEur',      v=>inputs.fxEur=v],
+  ['seatsInput', v=>inputs.seats=v],
+  ['tokensInput',v=>inputs.tokensM=v],
+  ['elecRate',   v=>inputs.elecRate=v],
+].forEach(([id,setter])=>{
+  document.getElementById(id).addEventListener('input',e=>{
+    const v=parseFloat(e.target.value);
+    if(!isNaN(v)&&v>0){ setter(v); renderAll(); }
+  });
+});
+document.getElementById('claudeBilling').addEventListener('change',e=>{
+  inputs.claudeUSD=parseFloat(e.target.value); renderAll();
+});
+
+// ============================================================
+// INIT
+// ============================================================
+renderDellSpec();
+renderAll();
+</script>
+
+</body>
+</html>
